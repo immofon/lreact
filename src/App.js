@@ -6,41 +6,67 @@ import kv from "./api/kv";
 import sleep from "./api/sleep";
 import rpc from "./api/rpc";
 
-class Article extends Component {
-  render() {
-    const title = this.props.title;
-    const content = this.props.content;
-    return (
-      <div>
-        <h2>{title}</h2>
-        <p>{content}</p>
-      </div>
-    );
-  }
-}
-
 class App extends Component {
   constructor(props) {
     super(props);
     this.log = this.log.bind(this);
     this.onLogin = this.onLogin.bind(this);
-    this.onChange = this.onChange.bind(this);
-    this.state = { logs: [], id: "$unlogined$", msg: kv.get("msg"), number: 0 };
+    this.onSelf = this.onSelf.bind(this);
+    this.update = this.update.bind(this);
+    this.state = {
+      msg: "",
+      logs: [],
+      user: {
+        id: "",
+        authed: false
+      },
+      rpc: {
+        connected: false
+      }
+    };
+
+    this.updater = setInterval(() => {
+      this.update();
+    }, 100);
+  }
+  update() {
+    this.setState({ rpc: { connected: rpc.connected() } });
   }
   onLogin() {
     (async () => {
+      const log = this.log;
       try {
-        this.log("try login");
         const ret = await rpc.call(
           "login",
-          { account: "mofon-admin" },
-          { log: this.log }
+          { account: "mofon-admin" }
+          //          { log: this.log }
         );
-        this.log(ret);
-        const id = await rpc.call("self");
-        this.log(id);
+        this.setState({
+          user: {
+            authed: true,
+            id: ret.id
+          }
+        });
       } catch (ret) {
-        this.setState({ id: JSON.stringify(ret) });
+        if (rpc.needAuth(ret)) {
+          log("you need auth first");
+        }
+        log(ret);
+      }
+    })();
+  }
+  onSelf() {
+    const setState = this.setState;
+    (async () => {
+      try {
+        const ret = await rpc.call("self");
+        this.log(ret);
+      } catch (e) {
+        if (rpc.needAuth(e)) {
+          this.setState({ msg: "you need auth first" });
+        } else {
+          throw e;
+        }
       }
     })();
   }
@@ -52,22 +78,17 @@ class App extends Component {
     logs.push(msg);
     this.setState({ logs });
   }
-  onChange(e) {
-    const msg = e.target.value;
-    kv.set("msg", msg);
-    this.setState({ msg });
-  }
   render() {
-    const number = this.state.number;
     const msg = this.state.msg;
     const logs = this.state.logs;
-    const onChange = this.onChange;
     const onLogin = this.onLogin;
+    const onSelf = this.onSelf;
 
     return (
       <div>
-        <p>{number}</p>
+        <p>{msg}</p>
         <button onClick={onLogin}>login</button>
+        <button onClick={onSelf}>Self</button>
         <code>{JSON.stringify(this.state, null, 2)}</code>
         <br />
         <ul>
@@ -75,9 +96,7 @@ class App extends Component {
             return <li>{m}</li>;
           })}
         </ul>
-        <input value={msg} onChange={onChange} />
-        <p>{msg}</p>
-        <Article title={"English P56"} content={msg} />
+        <br />
       </div>
     );
   }

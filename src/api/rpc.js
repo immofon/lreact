@@ -1,7 +1,10 @@
 import sleep from "./sleep";
 import ReconnectingWebSocket from "./reconnecting-websocket";
 
-let ws = new ReconnectingWebSocket("ws://39.105.42.45:8100/ws");
+let ws = new ReconnectingWebSocket("ws://39.105.42.45:8100/ws", null, {
+  maxReconnectInterval: 3000,
+  reconnectDecay: 1.0
+});
 let connected = false;
 let rtable = {}; // return table
 let id = 1;
@@ -27,15 +30,28 @@ ws.onmessage = evt => {
   }
 };
 
-let _call = (funcname, argv) => {
-  return new Promise((resolve, reject) => {
-    if (argv == undefined || argv == null) {
-      argv = {};
+function call(funcname, argv, options) {
+  if (argv == undefined || argv == null) {
+    argv = {};
+  }
+  if (typeof options != "object") {
+    options = {};
+  }
+
+  const log = options.log || (() => {});
+
+  id++;
+  const req_id = String(id);
+  return new Promise(async (resolve, reject) => {
+    for (var i = 0; i < 100000000 && !connected; i++) {
+      await sleep(100);
     }
+
+    log({ req_id });
     if (connected) {
-      id += 1;
-      const token = String(id);
-      rtable[token] = ret => {
+      log({ req_id });
+      rtable[req_id] = ret => {
+        log({ ret });
         if (ret.status == "ok") {
           resolve(ret);
         } else {
@@ -44,37 +60,39 @@ let _call = (funcname, argv) => {
       };
       ws.send(
         JSON.stringify({
-          id: token,
+          id: req_id,
           func: funcname,
           argv: argv
         })
       );
+
+      log("sent");
     } else {
-      console.log("rpc call to unconnected", funcname, argv);
       reject({
         status: "err",
         details: { err: "unconnected" }
       });
     }
   });
-};
+}
 
-async function call(
-  funcname,
-  argv,
-  { retry = 20, interval = 500, log = () => {} }
-) {
-  log(`call: ${funcname}`);
-  for (var i = 0; i < retry; i++) {
-    const ret = _call(funcname, argv);
-    if (ret.status == "err" && ret.details.unconnected == true) {
-      await sleep(interval);
-      continue;
-    }
-    return ret;
+function ok(ret) {
+  if (ret.status === "ok") {
+    return true;
   }
+  return false;
 }
 
 export default {
-  call
+  call,
+  ok,
+  needAuth: ret => {
+    if (!ok(ret) && ret.details.err == "require-auth") {
+      return true;
+    }
+    return false;
+  },
+  connected: () => {
+    return connected;
+  }
 };
