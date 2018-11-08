@@ -14,9 +14,13 @@ import {
 } from "antd-mobile";
 import "antd-mobile/dist/antd-mobile.css";
 
+import ErrorPage from "./view/ErrorPage";
+
 import kv from "./api/kv";
 import sleep from "./api/sleep";
 import rpc from "./api/rpc";
+
+import { maskPassword } from "./utils";
 
 class App extends Component {
   constructor(props) {
@@ -32,8 +36,10 @@ class App extends Component {
       user: {
         id: "",
         authed: false,
+        name: "",
+        role: "",
         input: {
-          account: "test",
+          account: "",
           password: ""
         }
       },
@@ -47,27 +53,42 @@ class App extends Component {
     }, 100);
   }
   update() {
+    /*
+			 this.setState(t => {
+			 t.rpc.connected = rpc.connected();
+			 });
+			 */
     this.setState({ rpc: { connected: rpc.connected() } });
   }
-  onChangeInput(v) {
-    this.setState({ user: { input: { password: v } } });
+  onChangeInput(fn) {
+    return v => {
+      this.setState($ => {
+        fn($, v);
+      });
+    };
   }
   onLogin() {
+    const $ = this.state;
+
     (async () => {
       const log = this.log;
       try {
-        const ret = await rpc.call("login", { account: "mofon-admin" });
-        this.setState({
-          user: {
-            authed: true,
-            id: ret.id
-          }
+        const ret = await rpc.call("login", {
+          account: $.user.input.account,
+          password: $.user.input.password
+        });
+        this.setState(t => {
+          t.user.authed = true;
+          t.user.id = ret.details.id;
+          t.user.name = ret.details.name;
+          t.user.role = ret.details.role;
         });
       } catch (ret) {
         if (rpc.needAuth(ret)) {
-          Toast.fail("you need auth first");
+          this.setState(t => {
+            t.user.authed = false;
+          });
         }
-        log(ret);
       }
     })();
   }
@@ -95,8 +116,11 @@ class App extends Component {
     this.setState({ logs });
   }
   render() {
-    const $ = this.state;
     const msg = this.state.msg;
+
+    const account = this.state.user.input.account;
+    const password = this.state.user.input.password;
+
     const logs = this.state.logs;
     const onLogin = this.onLogin;
     const onSelf = this.onSelf;
@@ -113,23 +137,35 @@ class App extends Component {
             return <li>{m}</li>;
           })}
         </ul>
+        <ErrorPage msg="try" />
         <br />
         <Modal
           title={"login"}
           visible={!this.state.user.authed}
           transparent={true}
         >
-          <InputItem value={"test"} placeholder="account" />
+          <InputItem
+            value={account}
+            onChange={onChangeInput(($, v) => {
+              $.user.input.account = v;
+            })}
+          >
+            学号
+          </InputItem>
           <InputItem
             format="password"
-            value={$.user.input.password}
-            onChange={onChangeInput}
-            placeholder="password"
-          />
+            clear
+            value={password}
+            onChange={onChangeInput(($, v) => {
+              $.user.input.password = v;
+            })}
+          >
+            密码
+          </InputItem>
           <WhiteSpace />
           <WhiteSpace />
           <WingBlank>
-            <Button>login</Button>
+            <Button onClick={onLogin}>login</Button>
           </WingBlank>
         </Modal>
         <ActivityIndicator
