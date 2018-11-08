@@ -3,7 +3,7 @@ import React, { Component } from "react";
 
 import "antd";
 import "antd/dist/antd.css";
-import { Button, Modal } from "antd-mobile";
+import { Button, WhiteSpace, Card, WingBlank } from "antd-mobile";
 import "antd-mobile/dist/antd-mobile.css";
 
 class ErrorPage extends Component {
@@ -18,8 +18,13 @@ class ErrorPage extends Component {
 
     return (
       <div>
-        <p> {this.props.msg} </p>
-        <Button onClick={this.onRefresh}>Refresh</Button>
+        <WingBlank>
+          <Card>
+            <Card.Body>{this.props.msg}</Card.Body>
+          </Card>
+          <WhiteSpace />
+          <Button onClick={this.onRefresh}>Refresh</Button>
+        </WingBlank>
       </div>
     );
   }
