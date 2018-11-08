@@ -1,6 +1,18 @@
 import React, { Component } from "react";
 //import logo from "./logo.svg";
-import "./App.css";
+
+import "antd";
+import "antd/dist/antd.css";
+import {
+  Toast,
+  Button,
+  WingBlank,
+  WhiteSpace,
+  InputItem,
+  ActivityIndicator,
+  Modal
+} from "antd-mobile";
+import "antd-mobile/dist/antd-mobile.css";
 
 import kv from "./api/kv";
 import sleep from "./api/sleep";
@@ -13,12 +25,17 @@ class App extends Component {
     this.onLogin = this.onLogin.bind(this);
     this.onSelf = this.onSelf.bind(this);
     this.update = this.update.bind(this);
+    this.onChangeInput = this.onChangeInput.bind(this);
     this.state = {
       msg: "",
       logs: [],
       user: {
         id: "",
-        authed: false
+        authed: false,
+        input: {
+          account: "test",
+          password: ""
+        }
       },
       rpc: {
         connected: false
@@ -32,15 +49,14 @@ class App extends Component {
   update() {
     this.setState({ rpc: { connected: rpc.connected() } });
   }
+  onChangeInput(v) {
+    this.setState({ user: { input: { password: v } } });
+  }
   onLogin() {
     (async () => {
       const log = this.log;
       try {
-        const ret = await rpc.call(
-          "login",
-          { account: "mofon-admin" }
-          //          { log: this.log }
-        );
+        const ret = await rpc.call("login", { account: "mofon-admin" });
         this.setState({
           user: {
             authed: true,
@@ -49,7 +65,7 @@ class App extends Component {
         });
       } catch (ret) {
         if (rpc.needAuth(ret)) {
-          log("you need auth first");
+          Toast.fail("you need auth first");
         }
         log(ret);
       }
@@ -79,16 +95,17 @@ class App extends Component {
     this.setState({ logs });
   }
   render() {
+    const $ = this.state;
     const msg = this.state.msg;
     const logs = this.state.logs;
     const onLogin = this.onLogin;
     const onSelf = this.onSelf;
+    const onChangeInput = this.onChangeInput;
 
     return (
       <div>
+        <br />
         <p>{msg}</p>
-        <button onClick={onLogin}>login</button>
-        <button onClick={onSelf}>Self</button>
         <code>{JSON.stringify(this.state, null, 2)}</code>
         <br />
         <ul>
@@ -97,6 +114,29 @@ class App extends Component {
           })}
         </ul>
         <br />
+        <Modal
+          title={"login"}
+          visible={!this.state.user.authed}
+          transparent={true}
+        >
+          <InputItem value={"test"} placeholder="account" />
+          <InputItem
+            format="password"
+            value={$.user.input.password}
+            onChange={onChangeInput}
+            placeholder="password"
+          />
+          <WhiteSpace />
+          <WhiteSpace />
+          <WingBlank>
+            <Button>login</Button>
+          </WingBlank>
+        </Modal>
+        <ActivityIndicator
+          animating={!this.state.rpc.connected}
+          toast
+          text="正在连接"
+        />
       </div>
     );
   }
